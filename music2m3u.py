@@ -85,6 +85,26 @@ def findit(db, artist, album, title):
     else:
         artist_ampersand = artist_no_the
 
+    if title_no_parens.count("’") != 0:
+        title_dumb = title_no_parens.replace("’", "'")
+    else:
+        title_dumb = title_no_parens
+
+    if artist_no_the.count("’") != 0:
+        artist_dumb = artist_no_the.replace("’", "'")
+    else:
+        artist_dumb = artist_no_the
+
+    rows = cu.execute("SELECT id, path FROM media_file WHERE title COLLATE NOCASE IN (?,?,?) AND artist COLLATE NOCASE IN (?,?,?)",
+                        (title_dumb, title_ampersand, title_no_parens, artist_dumb, artist_ampersand, artist_no_the, ))
+    r = rows.fetchone()
+    if r:
+        return r[1]
+    if DEBUG:
+        print(f"# tried title={title_dumb} or artist={artist_no_the}")
+
+
+
     rows = cu.execute("SELECT id, path FROM media_file WHERE title = ? COLLATE NOCASE AND artist = ? COLLATE NOCASE",
                         (title_ampersand, artist_ampersand, ))
     r = rows.fetchone()
@@ -92,6 +112,8 @@ def findit(db, artist, album, title):
         return r[1]
     if DEBUG:
         print(f"# tried title={title_ampersand or title} or title={title_no_parens} and artist={artist_ampersand or artist} or artist={artist_no_the}")
+
+    title_dumb = artist_dumb = None
 
 
     # Try just a raw title match and give them as potential matches
@@ -134,10 +156,13 @@ if not target_pl.endswith(".m3u"):
 try:
     playlist_name = sys.argv[3]
 except IndexError:
-    if path == "/dev/stdin":
-        playlist_name = "Imported Playlist"
-    else:
-        playlist_name = re.sub(r"^\./", "", re.sub(r"\.txt$", "", path))
+    try:
+        playlist_name = os.path.basename(re.sub(r".m3u$", "", target_pl))
+    except:
+        if path == "/dev/stdin":
+            playlist_name = "Imported Playlist"
+        else:
+            playlist_name = re.sub(r"^\./", "", re.sub(r"\.txt$", "", path))
 
 # Write our file
 with open(target_pl, "w+") as w:
