@@ -103,20 +103,52 @@ def findit(db, artist, album, title):
 
 ###   ### ### ###   ### ### ###   ### ### ###   ### ### ###   ### ### ###   ###
 
-path = sys.argv[1]
-target_pl = str.replace(sys.argv[1], ".txt", ".m3u")
-
 db = sqlite3.connect(DATABASE_PATH)
 
-playlist_name = str.replace(path, ".txt", " (Genius)")
-playlist_name = re.sub(r"^\./", "", playlist_name)
 
+if len(sys.argv) == 1:
+    print(f"Usage: {sys.argv[0]} <source file> <target file> <playlist name>")
+    sys.exit(1)
+
+# Try to open file or assume /dev/stdin if it isn't provided
+try:
+    path = sys.argv[1]
+except IndexError:
+    path = "/dev/stdin"
+
+if not os.path.exists(path):
+    print(f"ERROR: source file {path} does not exist")
+    sys.exit(1)
+
+# Use the target if specified, or interpolate it from the source
+try:
+    target_pl = sys.argv[2]
+except IndexError:
+    target_pl = str.replace(sys.argv[1], ".txt", "")
+
+# Make sure it ends in m3u
+if not target_pl.endswith(".m3u"):
+    target_pl += ".m3u"
+
+# Get the name as argv[3] or use the filename without the extension
+try:
+    playlist_name = sys.argv[3]
+except IndexError:
+    if path == "/dev/stdin":
+        playlist_name = "Imported Playlist"
+    else:
+        playlist_name = re.sub(r"^\./", "", re.sub(r"\.txt$", "", path))
+
+# Write our file
 with open(target_pl, "w+") as w:
+
+    # Use write() as a shortcut to print to the file
+    write = lambda *args: print(*args, file=w)
 
     print(f"Converting {playlist_name} playlist to m3u: {target_pl}")
 
-    print(w, "#EXTM3U")
-    print(w, f"#PLAYLIST:{playlist_name}")
+    write("#EXTM3U")
+    write(f"#PLAYLIST:{playlist_name}")
 
     # Read the playlist text file, split it into fields, and then look up the
     with open(path, "r") as f:
@@ -133,14 +165,14 @@ with open(target_pl, "w+") as w:
                 (hours, mins, sec) = time.split(":")
                 runtime = int(hours) * 3600 * int(mins) * 60 + int(sec)
 
-            print(w, f"#EXTINF:{runtime},{artist} - {name}")
+            write(f"#EXTINF:{runtime},{artist} - {name}")
 
             # If it is found, use it, otherwise indicate that it is not found
             filename = findit(db, artist, album, name) or f"#notfound: {artist}/{album}/{name}.mp3"
             if type(filename) == str:
-                print(w, filename)
+                write(filename)
             elif type(filename) == list:
                 for line in filename:
-                    print(w, line)
+                    write(line)
 
 db.close()
